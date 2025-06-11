@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 st.set_page_config(page_title="K-Means Clustering Produk", layout="wide")
-st.title("📦 Segmentasi Produk Berdasarkan Penjualan")
+st.title("\U0001F4E6 Segmentasi Produk Berdasarkan Penjualan")
 st.caption("Analisis Klaster Produk | Algoritma: K-Means Clustering")
 
 # Upload file
-uploaded_file = st.file_uploader("📁 Upload file Excel (.xlsx)", type=["xlsx"])
+uploaded_file = st.file_uploader("\U0001F4C1 Upload file Excel (.xlsx)", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file, engine="openpyxl")
-    st.subheader("🧾 Data Awal")
+    st.subheader("\U0001F9FE Data Awal")
     st.dataframe(df.head())
 
     # Pilih kolom numerik yang digunakan
@@ -27,7 +27,7 @@ if uploaded_file:
         X_scaled = scaler.fit_transform(df[fitur_numerik])
 
         # Elbow method
-        st.subheader("📉 Penentuan Jumlah Klaster (Elbow Method)")
+        st.subheader("\U0001F4C9 Penentuan Jumlah Klaster (Elbow Method)")
         distortions = []
         K = range(1, 11)
         for k in K:
@@ -51,7 +51,7 @@ if uploaded_file:
         df["Cluster"] = clusters
 
         # Visualisasi hasil clustering
-        st.subheader("📊 Hasil Clustering")
+        st.subheader("\U0001F4CA Hasil Clustering")
         fig_scatter, ax2 = plt.subplots()
         sns.scatterplot(
             x=df[fitur_numerik[0]],
@@ -64,11 +64,11 @@ if uploaded_file:
         st.pyplot(fig_scatter)
 
         # Tampilkan hasil
-        st.subheader("📋 Data dengan Klaster")
+        st.subheader("\U0001F4CB Data dengan Klaster")
         st.dataframe(df)
 
         # Analisis per cluster
-        st.subheader("📈 Rata-rata per Cluster")
+        st.subheader("\U0001F4C8 Rata-rata per Cluster")
         st.dataframe(df.groupby("Cluster")[fitur_numerik].mean())
 
 else:
