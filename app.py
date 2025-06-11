@@ -1,79 +1,75 @@
 import streamlit as st
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import accuracy_score
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-st.set_page_config(page_title="Prediksi Risiko Pasien", layout="centered")
-st.title("🎯 Prediksi Risiko Pasien Menggunakan Decision Tree")
-st.caption("Dataset: Rumah Sakit XYZ | Sumber: Excel")
+st.set_page_config(page_title="K-Means Clustering Produk", layout="wide")
+st.title("📦 Segmentasi Produk Berdasarkan Penjualan")
+st.caption("Analisis Klaster Produk | Algoritma: K-Means Clustering")
 
-# Load data dari Excel
-@st.cache_data
-def load_data():
-    df = pd.read_excel("data_pasien.xlsx", engine="openpyxl")  # <- sesuaikan nama file
-    if "No" in df.columns:
-        df = df.drop("No", axis=1)  # kolom No tidak dipakai jika ada
-    return df
+# Upload file
+uploaded_file = st.file_uploader("📁 Upload file Excel (.xlsx)", type=["xlsx"])
+if uploaded_file:
+    df = pd.read_excel(uploaded_file, engine="openpyxl")
+    st.subheader("🧾 Data Awal")
+    st.dataframe(df.head())
 
-data = load_data()
-st.subheader("📊 Data Pasien")
-st.dataframe(data.head())
+    # Pilih kolom numerik yang digunakan
+    fitur_numerik = ["Jumlah Order", "Harga", "Total Penjualan"]
+    if not all(col in df.columns for col in fitur_numerik):
+        st.error(f"❌ Kolom yang dibutuhkan tidak ditemukan. Harus ada: {fitur_numerik}")
+    else:
+        # Normalisasi
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(df[fitur_numerik])
 
-# Label Encoding
-label_encoders = {}
-df_encoded = data.copy()
-for col in df_encoded.columns:
-    if df_encoded[col].dtype == "object":
-        le = LabelEncoder()
-        df_encoded[col] = le.fit_transform(df_encoded[col])
-        label_encoders[col] = le
+        # Elbow method
+        st.subheader("📉 Penentuan Jumlah Klaster (Elbow Method)")
+        distortions = []
+        K = range(1, 11)
+        for k in K:
+            kmeans = KMeans(n_clusters=k, random_state=42)
+            kmeans.fit(X_scaled)
+            distortions.append(kmeans.inertia_)
 
-# Split data
-X = df_encoded.drop("Hasil", axis=1)
-y = df_encoded["Hasil"]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        fig_elbow, ax = plt.subplots()
+        ax.plot(K, distortions, marker='o')
+        ax.set_xlabel('Jumlah Klaster (k)')
+        ax.set_ylabel('Inertia')
+        ax.set_title('Elbow Method untuk Menentukan k Optimal')
+        st.pyplot(fig_elbow)
 
-# Train model
-model = DecisionTreeClassifier(max_depth=4, random_state=42)
-model.fit(X_train, y_train)
+        # Pilih jumlah cluster
+        k = st.slider("Pilih jumlah klaster", 2, 10, 3)
 
-# Akurasi
-y_pred = model.predict(X_test)
-acc = accuracy_score(y_test, y_pred)
-st.success(f"🎉 Akurasi Model: {acc*100:.2f}%")
+        # Jalankan K-Means
+        kmeans = KMeans(n_clusters=k, random_state=42)
+        clusters = kmeans.fit_predict(X_scaled)
+        df["Cluster"] = clusters
 
-# Visualisasi Decision Tree
-st.subheader("🌳 Visualisasi Pohon Keputusan")
-fig, ax = plt.subplots(figsize=(12, 6))
-plot_tree(model, feature_names=X.columns, class_names=["Tidak", "Ya"], filled=True, ax=ax)
-st.pyplot(fig)
+        # Visualisasi hasil clustering
+        st.subheader("📊 Hasil Clustering")
+        fig_scatter, ax2 = plt.subplots()
+        sns.scatterplot(
+            x=df[fitur_numerik[0]],
+            y=df[fitur_numerik[2]],
+            hue=df["Cluster"],
+            palette="viridis",
+            ax=ax2
+        )
+        ax2.set_title("Visualisasi Cluster (Jumlah Order vs Total Penjualan)")
+        st.pyplot(fig_scatter)
 
-# Form prediksi manual
-st.subheader("🔍 Prediksi Risiko Baru")
+        # Tampilkan hasil
+        st.subheader("📋 Data dengan Klaster")
+        st.dataframe(df)
 
-def user_input():
-    input_data = []
-    for col in X.columns:
-        input_data.append(st.selectbox(col, data[col].unique()))
-    df_input = pd.DataFrame([input_data], columns=X.columns)
+        # Analisis per cluster
+        st.subheader("📈 Rata-rata per Cluster")
+        st.dataframe(df.groupby("Cluster")[fitur_numerik].mean())
 
-    for col in df_input.columns:
-        le = label_encoders[col]
-        df_input[col] = le.transform(df_input[col])
-
-    return df_input
-
-input_df = user_input()
-pred = model.predict(input_df)[0]
-hasil_label = label_encoders["Hasil"].inverse_transform([pred])[0]
-
-st.info(f"🧾 Prediksi Risiko Pasien: **{hasil_label}**")
-
-# Tampilkan data asli + prediksi model
-st.subheader("📋 Hasil Prediksi Data Asli")
-df_encoded["Prediksi"] = model.predict(X)
-df_encoded["Prediksi_Label"] = label_encoders["Hasil"].inverse_transform(df_encoded["Prediksi"])
-st.dataframe(df_encoded)
+else:
+    st.info("Silakan upload file Excel dengan kolom: 'Jumlah Order', 'Harga', 'Total Penjualan'")
