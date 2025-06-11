@@ -16,7 +16,7 @@ if uploaded_file is not None:
     selected_sheet = st.selectbox("Pilih Sheet", sheet_names)
 
     # Membaca sheet yang dipilih
-    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet)
+    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, engine="openpyxl")
     st.write("Dataframe:")
     st.dataframe(df)
 
