@@ -1,47 +1,79 @@
 import streamlit as st
 import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
+import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Analisis Data Excel & CSV", layout="wide")
-st.title("📊 Analisis Data - Streamlit App")
+st.set_page_config(page_title="Prediksi Risiko Pasien", layout="centered")
+st.title("🎯 Prediksi Risiko Pasien Menggunakan Decision Tree")
+st.caption("Dataset: Rumah Sakit XYZ | Sumber: Excel")
 
-# Upload file
-uploaded_file = st.file_uploader("📁 Upload file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
+# Load data dari Excel
+@st.cache_data
+def load_data():
+    df = pd.read_excel("data_pasien.xlsx", engine="openpyxl")  # <- sesuaikan nama file
+    if "No" in df.columns:
+        df = df.drop("No", axis=1)  # kolom No tidak dipakai jika ada
+    return df
 
-if uploaded_file is not None:
-    file_name = uploaded_file.name
+data = load_data()
+st.subheader("📊 Data Pasien")
+st.dataframe(data.head())
 
-    try:
-        # Cek ekstensi file dan baca data
-        if file_name.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(uploaded_file, engine="openpyxl")
+# Label Encoding
+label_encoders = {}
+df_encoded = data.copy()
+for col in df_encoded.columns:
+    if df_encoded[col].dtype == "object":
+        le = LabelEncoder()
+        df_encoded[col] = le.fit_transform(df_encoded[col])
+        label_encoders[col] = le
 
-        st.success(f"✅ Berhasil membaca file: `{file_name}`")
-        st.subheader("🧾 Data Awal:")
-        st.dataframe(df)
+# Split data
+X = df_encoded.drop("Hasil", axis=1)
+y = df_encoded["Hasil"]
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Statistik Deskriptif
-        if st.checkbox("📈 Tampilkan Ringkasan Statistik"):
-            st.subheader("Ringkasan Statistik:")
-            st.write(df.describe())
+# Train model
+model = DecisionTreeClassifier(max_depth=4, random_state=42)
+model.fit(X_train, y_train)
 
-        # Filter kolom numerik
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
-        if numeric_cols:
-            st.subheader("🔍 Filter Data Berdasarkan Nilai")
-            col_to_filter = st.selectbox("Pilih Kolom Numerik", numeric_cols)
-            min_val = float(df[col_to_filter].min())
-            max_val = float(df[col_to_filter].max())
-            range_val = st.slider("Pilih Rentang Nilai", min_val, max_val, (min_val, max_val))
-            df_filtered = df[(df[col_to_filter] >= range_val[0]) & (df[col_to_filter] <= range_val[1])]
-            st.write(f"Hasil Filter pada kolom **{col_to_filter}**:")
-            st.dataframe(df_filtered)
-        else:
-            st.info("Tidak ada kolom numerik untuk difilter.")
+# Akurasi
+y_pred = model.predict(X_test)
+acc = accuracy_score(y_test, y_pred)
+st.success(f"🎉 Akurasi Model: {acc*100:.2f}%")
 
-    except Exception as e:
-        st.error(f"❌ Gagal membaca file. Error: {e}")
+# Visualisasi Decision Tree
+st.subheader("🌳 Visualisasi Pohon Keputusan")
+fig, ax = plt.subplots(figsize=(12, 6))
+plot_tree(model, feature_names=X.columns, class_names=["Tidak", "Ya"], filled=True, ax=ax)
+st.pyplot(fig)
 
-else:
-    st.info("Silakan upload file terlebih dahulu.")
+# Form prediksi manual
+st.subheader("🔍 Prediksi Risiko Baru")
+
+def user_input():
+    input_data = []
+    for col in X.columns:
+        input_data.append(st.selectbox(col, data[col].unique()))
+    df_input = pd.DataFrame([input_data], columns=X.columns)
+
+    for col in df_input.columns:
+        le = label_encoders[col]
+        df_input[col] = le.transform(df_input[col])
+
+    return df_input
+
+input_df = user_input()
+pred = model.predict(input_df)[0]
+hasil_label = label_encoders["Hasil"].inverse_transform([pred])[0]
+
+st.info(f"🧾 Prediksi Risiko Pasien: **{hasil_label}**")
+
+# Tampilkan data asli + prediksi model
+st.subheader("📋 Hasil Prediksi Data Asli")
+df_encoded["Prediksi"] = model.predict(X)
+df_encoded["Prediksi_Label"] = label_encoders["Hasil"].inverse_transform(df_encoded["Prediksi"])
+st.dataframe(df_encoded)
